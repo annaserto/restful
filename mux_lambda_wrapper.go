@@ -121,9 +121,22 @@ func lambdaGetParams(w http.ResponseWriter, r *http.Request, f any) ([]reflect.V
 				return nil, r, err
 			}
 
-			if LambdaValidator && reflect.ValueOf(reqDataInterface).Elem().Kind() == reflect.Struct {
-				if err := validate.Struct(reqDataInterface); err != nil {
-					return nil, r, NewError(err, LambdaValidationErrorStatus)
+			if LambdaValidator {
+				val := reflect.ValueOf(reqDataInterface).Elem()
+
+				if val.Kind() == reflect.Struct {
+					if err := validate.Struct(reqDataInterface); err != nil {
+						return nil, r, NewError(err, LambdaValidationErrorStatus)
+					}
+				} else if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
+					for i := range val.Len() {
+						elem := val.Index(i).Interface()
+						if reflect.ValueOf(elem).Kind() == reflect.Struct {
+							if err := validate.Struct(elem); err != nil {
+								return nil, r, NewError(err, LambdaValidationErrorStatus)
+							}
+						}
+					}
 				}
 			}
 
