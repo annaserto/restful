@@ -53,6 +53,13 @@ func (r *Router) DisallowUnknownFields() *Router {
 	return r.Monitor(disallowUnknownFieldsToCtx, nil)
 }
 
+// DisallowNullIntegers instructs JSON decoding of requests to fail when null is assigned to an integer field.
+// A missing field is still accepted. A field tagged `nullable:"true"` is still accepted.
+// By default null is accepted and stored as a nil pointer.
+func (r *Router) DisallowNullIntegers() *Router {
+	return r.Monitor(disallowNullIntegersToCtx, nil)
+}
+
 // MethodNotAllowedHandler sets the handler invoked when a request matches a route path but not its HTTP method.
 // Caution: if same path is set for multiple handlerfunction with different Methods, setting MethodNotAllowedHandler is not advised.
 func (r *Router) MethodNotAllowedHandler(handler http.Handler) *Router {

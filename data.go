@@ -36,6 +36,12 @@ var (
 	// This flag is kept for backward compatibility.
 	// You are encouraged to append `json.RejectUnknownMembers(true)` to JSONOptions instead.
 	DisallowUnknownFields = false
+
+	// DisallowNullIntegers makes request JSON decoding fail when null is assigned to an integer field.
+	// A missing field is still accepted. A field tagged `nullable:"true"` is still accepted.
+	// By default null is accepted and stored as a nil pointer.
+	// Applies to requests only, not to GetResponseData.
+	DisallowNullIntegers = false
 )
 
 type disallowUnknownFieldsCtxKeyType string
@@ -44,6 +50,14 @@ const disallowUnknownFieldsCtxName = disallowUnknownFieldsCtxKeyType("restfulDis
 
 func disallowUnknownFieldsToCtx(w http.ResponseWriter, r *http.Request) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), disallowUnknownFieldsCtxName, true))
+}
+
+type disallowNullIntegersCtxKeyType string
+
+const disallowNullIntegersCtxName = disallowNullIntegersCtxKeyType("restfulDisNullInt")
+
+func disallowNullIntegersToCtx(w http.ResponseWriter, r *http.Request) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), disallowNullIntegersCtxName, true))
 }
 
 var (
@@ -179,7 +193,18 @@ func getDataJSON(ctx context.Context, w http.ResponseWriter, headers http.Header
 	if DisallowUnknownFields || ctx.Value(disallowUnknownFieldsCtxName) != nil {
 		opts = append(opts, json.RejectUnknownMembers(true))
 	}
-	err = json.UnmarshalRead(limitedBody, data, opts...)
+	rejectNull := statusCode <= 0 && (DisallowNullIntegers || ctx.Value(disallowNullIntegersCtxName) != nil)
+	if rejectNull {
+		var body []byte
+		body, err = io.ReadAll(limitedBody)
+		if err == nil {
+			if err = rejectNullIntegers(body, data); err == nil {
+				err = json.Unmarshal(body, data, opts...)
+			}
+		}
+	} else {
+		err = json.UnmarshalRead(limitedBody, data, opts...)
+	}
 	if err != nil {
 		if maxBytes > 0 && strings.Contains(err.Error(), "request body too large") {
 			dropBody(limitedBody)
